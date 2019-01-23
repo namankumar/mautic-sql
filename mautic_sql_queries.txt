@@ -1,0 +1,85 @@
+
+SQL queries for Mautic database
+
+-- select * from campaign_lead_event_log where lead_id = 141307
+
+-- select distinct lead_id from campaign_lead_event_log where campaign_id = 18 and event_id = 109
+
+-- select event_id, count(lead_id) from campaign_lead_event_log where campaign_id = 18 group by event_id
+
+//Number of events for a given campaing and event_id
+-- select count(evt) from campaign_lead_event_log  in (select lead_id, max(event_id) as evt, is_scheduled, trigger_date from campaign_lead_event_log where campaign_id = 18 and event_id < 124 group by lead_id)
+
+
+//Delete blank contacts. delete the results of this query
+SELECT * FROM leads WHERE lead_lists_leads.lead_id IN (SELECT id  FROM leads WHERE leads.firstname IS NULL AND leads.email IS NULL)
+
+
+//Make a segment in mautic consisting of contacts in multiple segments. The 4 sql queries below will remove all segments for a contact except the one segment that the contact needs to be in. 
+
+// 1 .Find overlapping segments
+
+SELECT lead_id, leadlist_id FROM lead_lists_leads WHERE lead_id IN (SELECT lead_id FROM lead_lists_leads WHERE leadlist_id = 25) AND leadlist_id != 19
+
+// 2. Put overlapping data in temp table
+
+CREATE TEMPORARY TABLE temp22 AS
+(
+
+SELECT lead_id, leadlist_id FROM lead_lists_leads
+
+WHERE lead_id IN (SELECT lead_id FROM lead_lists_leads
+
+WHERE leadlist_id = 25) 
+
+AND leadlist_id != 2
+
+)
+
+
+
+// 3. Delete overlapping data
+
+DELETE lead_lists_leads.* FROM lead_lists_leads
+
+inner join temp22 on
+
+lead_lists_leads.leadlist_id = temp22.leadlist_id 
+
+AND lead_lists_leads.lead_id = temp22.lead_id 
+
+AND temp22.leadlist_id != 18
+
+
+
+// 4. Drop temp table to repeat op
+
+DROP TABLE temp22
+
+
+
+//Delete anonymous contacts that have been assigned to a segment
+
+DELETE from lead_lists_leads where lead_id 
+IN (Select id from leads where leads.email is null)
+AND leadlist_id = 6
+
+
+//Delete emails that are "sent" in mautic but then deleted at the spool.
+//also delete emails that were deleted from email section of mautic.
+
+// 1. Find the emails
+Select * from email_stats where copy_id="b8b03eb25d8ae364e18ed0f680053b69" and email_id="xxx"
+
+// 2. View the original copy
+Select * from email_copies where id="653e745b599bd6e837e64cf4e1975f28"
+
+// 3. Find which emails were deleted from the email section of mautic
+SELECT
+    email_id, copy_id, COUNT(*)
+FROM
+    email_stats
+GROUP BY
+    email_id, copy_id
+HAVING 
+    COUNT(*) > 1
